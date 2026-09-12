@@ -1,20 +1,11 @@
-import subprocess
-import time
 import streamlit as st
-import requests
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
 
-# Automatically start FastAPI Backend on Streamlit Cloud Startup
-@st.cache_resource
-def start_backend_server():
-    process = subprocess.Popen(["uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"])
-    time.sleep(2)  # Allow backend to bind to port 8000
-    return process
-
-start_backend_server()
+# Import ML & Optimization functions directly
+from main import predict_telemetry, run_optimization  # Adjust function names based on your main.py
 
 # Page Config
 st.set_page_config(page_title="FLEXFACTORY AI — Smart Control Room", layout="wide", initial_sidebar_state="expanded")
@@ -59,9 +50,9 @@ if selected == "Live Control Room":
 
     with col_display:
         if analyze_btn:
-            payload = {"power_kw": power, "production_rate_ppm": production, "temperature_c": temp}
             try:
-                res = requests.post("http://127.0.0.1:8000/api/telemetry", json=payload).json()
+                # Direct python execution instead of HTTP request
+                res = predict_telemetry(power, production, temp)
                 
                 # Metrics Row
                 m1, m2, m3 = st.columns(3)
@@ -95,7 +86,7 @@ if selected == "Live Control Room":
                 st.plotly_chart(fig_gauge, use_container_width=True)
 
             except Exception as e:
-                st.error("⚠️ Backend API unreachable! Ensure `uvicorn main:app --reload` is running.")
+                st.error(f"Execution Error: {e}")
 
 # ----------------------------------------------------
 # TAB 2: AI OPTIMIZATION ENGINE
@@ -122,9 +113,9 @@ elif selected == "AI Optimization Engine":
                 'Machine_C': {'capacity': 500, 'sec': 0.24, 'is_healthy': True}
             }
             
-            payload = {"target_units": target_units, "machines_status": machines_status}
             try:
-                opt_res = requests.post("http://127.0.0.1:8000/api/optimize", json=payload).json()
+                # Direct python execution instead of HTTP request
+                opt_res = run_optimization(target_units, machines_status)
                 alloc = opt_res.get("optimized_allocation")
                 
                 if alloc:
@@ -139,7 +130,7 @@ elif selected == "AI Optimization Engine":
                     
                     st.success("🎉 **Optimization Complete:** Workload shifted away from unhealthy Machine_B to prevent power surge and motor breakdown!")
             except Exception as e:
-                st.error("Error connecting to Backend Optimization Engine!")
+                st.error(f"Optimization Engine Error: {e}")
 
 # ----------------------------------------------------
 # TAB 3: ANALYTICS & DIAGNOSTICS
