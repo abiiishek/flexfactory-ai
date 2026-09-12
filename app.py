@@ -1,9 +1,20 @@
+import subprocess
+import time
 import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
+
+# Automatically start FastAPI Backend on Streamlit Cloud Startup
+@st.cache_resource
+def start_backend_server():
+    process = subprocess.Popen(["uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"])
+    time.sleep(2)  # Allow backend to bind to port 8000
+    return process
+
+start_backend_server()
 
 # Page Config
 st.set_page_config(page_title="FLEXFACTORY AI — Smart Control Room", layout="wide", initial_sidebar_state="expanded")
