@@ -6,3 +6,4 @@ xgboost
 ortools
 fastapi
 uvicorn
+streamlit-option-menu
