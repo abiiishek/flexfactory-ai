@@ -1,15 +1,18 @@
 from fastapi import FastAPI
 import pickle
 import pandas as pd
+import os
 from optimizer import optimize_production
 
 app = FastAPI(title="Flex Factory AI Engine")
 
-# Load Trained Models
-with open('anomaly_model.pkl', 'rb') as f:
+# Get absolute path for relative model loading in Cloud
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(BASE_DIR, 'anomaly_model.pkl'), 'rb') as f:
     anomaly_model = pickle.load(f)
 
-with open('energy_model.pkl', 'rb') as f:
+with open(os.path.join(BASE_DIR, 'energy_model.pkl'), 'rb') as f:
     energy_model = pickle.load(f)
 
 @app.get("/")

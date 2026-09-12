@@ -4,8 +4,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from streamlit_option_menu import option_menu
 
-# Import ML & Optimization functions directly
-from main import predict_telemetry, run_optimization  # Adjust function names based on your main.py
+# Import ML & Optimization functions directly from main.py
+from main import analyze_telemetry, run_optimization
 
 # Page Config
 st.set_page_config(page_title="FLEXFACTORY AI — Smart Control Room", layout="wide", initial_sidebar_state="expanded")
@@ -51,8 +51,8 @@ if selected == "Live Control Room":
     with col_display:
         if analyze_btn:
             try:
-                # Direct python execution instead of HTTP request
-                res = predict_telemetry(power, production, temp)
+                payload = {"power_kw": power, "production_rate_ppm": production, "temperature_c": temp}
+                res = analyze_telemetry(payload)
                 
                 # Metrics Row
                 m1, m2, m3 = st.columns(3)
@@ -114,8 +114,8 @@ elif selected == "AI Optimization Engine":
             }
             
             try:
-                # Direct python execution instead of HTTP request
-                opt_res = run_optimization(target_units, machines_status)
+                payload = {"target_units": target_units, "machines_status": machines_status}
+                opt_res = run_optimization(payload)
                 alloc = opt_res.get("optimized_allocation")
                 
                 if alloc:
