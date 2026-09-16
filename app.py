@@ -30,16 +30,16 @@ st.markdown("""
 with st.sidebar:
     st.image("https://img.icons8.com/color/96/factory.png", width=60)
     st.title("FlexFactory Controls")
-    st.caption("Day 4 Hardware & Telemetry Bridge")
+    st.caption("IoT Hardware & Telemetry Bridge")
     st.markdown("---")
     
     data_source = st.radio(
         "📡 Telemetry Data Source",
-        ["Simulated Telemetry (Cloud Demo)", "Serial Bridge (ESP32/Arduino)"],
+        ["Simulated Telemetry", "Serial Bridge"],
         index=0
     )
     
-    if "Serial Bridge" in data_source:
+    if data_source == "Serial Bridge":
         com_port = st.selectbox("COM Port Selection", ["COM3", "COM4", "/dev/ttyUSB0"], index=0)
         baud_rate = st.selectbox("Baud Rate", [9600, 115200], index=1)
         st.success(f"Connected to {com_port} @ {baud_rate} baud")
