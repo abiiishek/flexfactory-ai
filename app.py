@@ -84,18 +84,15 @@ if selected == "Live Control Room":
 
     with col_display:
         try:
-            # Instant Live AI Inference Execution
             payload = {"power_kw": power, "production_rate_ppm": production, "temperature_c": temp}
             res = analyze_telemetry(payload)
             
-            # Physics-Informed Wear & RUL Calculations
-            base_life = 8000 # Standard Motor Hours
+            base_life = 8000
             temp_penalty = max(0, (temp - 60) * 85)
             power_penalty = max(0, (power - 6.5) * 120)
             remaining_rul_hrs = max(0, round(base_life - operating_hours - temp_penalty - power_penalty, 1))
             health_idx = max(0.0, min(100.0, round((remaining_rul_hrs / base_life) * 100, 1)))
 
-            # Metric Cards Row
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Predicted Power", f"{res['predicted_power_kw']} kW")
             m2.metric("Actual Power", f"{power} kW", delta=round(power - res['predicted_power_kw'], 2), delta_color="inverse")
@@ -112,7 +109,6 @@ if selected == "Live Control Room":
             else:
                 st.success(f"✅ **System Status:** {res['status']}")
 
-            # Live Gauges Row
             g_col1, g_col2 = st.columns(2)
             
             with g_col1:
@@ -193,7 +189,6 @@ elif selected == "AI Optimization Engine":
                     alloc = opt_res.get("optimized_allocation")
                     
                     if alloc:
-                        # Baseline vs Optimized Math
                         equal_share = target_units / 3.0
                         opt_energy = (alloc.get('Machine_A', 0) * 0.20) + (alloc.get('Machine_B', 0) * 0.38) + (alloc.get('Machine_C', 0) * 0.24)
                         baseline_energy = (equal_share * 0.20) + (equal_share * 0.38) + (equal_share * 0.24)
@@ -203,7 +198,6 @@ elif selected == "AI Optimization Engine":
                         co2_saved = round(energy_saved * 0.82, 1)
                         pct_saved = round((energy_saved / baseline_energy) * 100, 1) if baseline_energy > 0 else 0
 
-                        # Metric Cards
                         k1, k2, k3 = st.columns(3)
                         k1.metric("Dynamic Energy Saved", f"{energy_saved} kWh", delta=f"{pct_saved}% Reduction", delta_color="normal")
                         k2.metric("Production Cost Saved", f"₹ {cost_saved}", delta="Tariff Savings", delta_color="normal")
@@ -211,12 +205,11 @@ elif selected == "AI Optimization Engine":
                         
                         st.markdown("---")
 
-                        # Grouped Bar Chart: Before vs After Allocation
                         chart_data = pd.DataFrame({
                             'Machine': ['Machine_A', 'Machine_B', 'Machine_C'] * 2,
                             'Workload (Units)': [
-                                equal_share, equal_share, equal_share, # Baseline
-                                alloc.get('Machine_A', 0), alloc.get('Machine_B', 0), alloc.get('Machine_C', 0) # Optimized
+                                equal_share, equal_share, equal_share,
+                                alloc.get('Machine_A', 0), alloc.get('Machine_B', 0), alloc.get('Machine_C', 0)
                             ],
                             'Allocation Type': ['Unoptimized Baseline'] * 3 + ['CP-SAT AI Optimized'] * 3
                         })
@@ -234,10 +227,9 @@ elif selected == "AI Optimization Engine":
                         fig_compare.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
                         st.plotly_chart(fig_compare, use_container_width=True)
 
-                        # Data Matrix Table
                         st.write("### 📋 Detailed Allocation Breakdown")
                         summary_table = pd.DataFrame({
-                            "Machine": ["Machine_A", "Machine_B (Degraded)", "Machine_C"],
+                            "Machine": ["Machine_A", "Machine_B", "Machine_C"],
                             "SEC (kWh/Unit)": [0.20, 0.38, 0.24],
                             "Baseline Units": [round(equal_share), round(equal_share), round(equal_share)],
                             "Optimized Units": [alloc.get('Machine_A', 0), alloc.get('Machine_B', 0), alloc.get('Machine_C', 0)],
@@ -249,7 +241,15 @@ elif selected == "AI Optimization Engine":
                         })
                         st.dataframe(summary_table, use_container_width=True, hide_index=True)
 
-                        st.success("🎉 **Optimization Complete:** Workload shifted away from degraded Machine_B to prevent power surge and motor breakdown!")
+                        # Dynamic Machine Degrade Detection Message
+                        degraded_machines = [m_name for m_name, m_info in machines_status.items() if not m_info['is_healthy']]
+                        
+                        if degraded_machines:
+                            degraded_str = ", ".join(degraded_machines)
+                            st.success(f"🎉 **Optimization Complete:** Workload shifted away from degraded **{degraded_str}** to prevent power surge and motor breakdown!")
+                        else:
+                            st.success("🎉 **Optimization Complete:** All machines healthy. Balanced dynamic workload distribution applied for maximum efficiency!")
+
                 except Exception as e:
                     st.error(f"Optimization Engine Error: {e}")
 
@@ -259,7 +259,6 @@ elif selected == "AI Optimization Engine":
 elif selected == "RUL & Advanced Analytics":
     st.subheader("📊 Machine Degradation, Health Index & RUL Analytics")
     
-    # Overview Cards
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Overall Plant Health", "84.2%", delta="-2.1% (30 Days)")
     c2.metric("Machine_A RUL", "4,210 Hrs", delta="Healthy (88%)")
@@ -268,7 +267,6 @@ elif selected == "RUL & Advanced Analytics":
 
     st.markdown("---")
 
-    # Time-Series Diagnostic Data Simulation
     time_series = pd.date_range(end=pd.Timestamp.now(), periods=100, freq='h')
     np.random.seed(42)
     
@@ -298,7 +296,6 @@ elif selected == "RUL & Advanced Analytics":
                           title="Plant Fleet Health Degradation Trend")
         st.plotly_chart(fig_deg, use_container_width=True)
 
-    # Predictive Maintenance Recommendations Matrix
     st.write("### 🛠️ Predictive Maintenance & Action Matrix")
     diag_summary = pd.DataFrame({
         "Machine ID": ["Machine_A", "Machine_B", "Machine_C"],
