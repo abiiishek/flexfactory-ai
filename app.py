@@ -178,14 +178,14 @@ elif selected == "AI Optimization Engine":
         target_units = st.number_input("Target Total Output (Units)", min_value=100, max_value=5000, value=1200, step=100)
         
         st.write("### 🏗️ Factory Plant Status")
-        st.info(f"**Total Physical Capacity:** {total_plant_capacity} Units\n\n• Machine_A: Normal (SEC: 0.20)\n• Machine_B: High Thermal Degrade (SEC: 0.38)\n• Machine_C: Balanced (SEC: 0.24)")
+        st.info(f"**Total Physical Capacity:** {total_plant_capacity} Units\n\n• **Machine_A:** Normal (SEC: 0.20)\n• **Machine_B:** High Thermal Degrade (SEC: 0.38)\n• **Machine_C:** Balanced (SEC: 0.24)")
         
-        run_opt = st.button("🚀 Calculate Optimal Allocation", use_container_width=True)
+        run_opt = st.button("🚀 Calculate Optimal Allocation", use_container_width=True, type="primary")
 
     with col_opt_out:
         if run_opt:
             if target_units > total_plant_capacity:
-                st.error(f"⚠️ **Target Exceeds Physical Plant Capacity!**\n\nMaximum Plant Capacity: **{total_plant_capacity} Units** | Requested Target: **{target_units} Units**.\nPlease reduce target output or introduce additional machinery.")
+                st.error(f"⚠️ **Target Exceeds Physical Plant Capacity!**\n\nMaximum Plant Capacity: **{total_plant_capacity} Units** | Requested Target: **{target_units} Units**.")
             else:
                 try:
                     payload = {"target_units": target_units, "machines_status": machines_status}
@@ -193,31 +193,62 @@ elif selected == "AI Optimization Engine":
                     alloc = opt_res.get("optimized_allocation")
                     
                     if alloc:
-                        # Dynamic Exact Energy & Financial Math
-                        opt_energy = (alloc.get('Machine_A', 0) * 0.20) + (alloc.get('Machine_B', 0) * 0.38) + (alloc.get('Machine_C', 0) * 0.24)
+                        # Baseline vs Optimized Math
                         equal_share = target_units / 3.0
+                        opt_energy = (alloc.get('Machine_A', 0) * 0.20) + (alloc.get('Machine_B', 0) * 0.38) + (alloc.get('Machine_C', 0) * 0.24)
                         baseline_energy = (equal_share * 0.20) + (equal_share * 0.38) + (equal_share * 0.24)
                         
                         energy_saved = max(0.0, round(baseline_energy - opt_energy, 1))
-                        cost_saved = round(energy_saved * 8.5, 1) # ₹8.5/kWh industrial tariff
-                        co2_saved = round(energy_saved * 0.82, 1)   # 0.82 kg CO2/kWh grid factor
+                        cost_saved = round(energy_saved * 8.5, 1)
+                        co2_saved = round(energy_saved * 0.82, 1)
+                        pct_saved = round((energy_saved / baseline_energy) * 100, 1) if baseline_energy > 0 else 0
 
-                        # Real-Time ROI Metrics Display
+                        # Metric Cards
                         k1, k2, k3 = st.columns(3)
-                        k1.metric("Dynamic Energy Saved", f"{energy_saved} kWh", delta=f"{round((energy_saved/baseline_energy)*100, 1)}% Saved")
-                        k2.metric("Production Cost Saved", f"₹ {cost_saved}", delta="Direct Tariff Savings")
-                        k3.metric("Carbon Footprint Reduction", f"{co2_saved} kg CO2", delta="-100% Waste Avoided")
+                        k1.metric("Dynamic Energy Saved", f"{energy_saved} kWh", delta=f"{pct_saved}% Reduction", delta_color="normal")
+                        k2.metric("Production Cost Saved", f"₹ {cost_saved}", delta="Tariff Savings", delta_color="normal")
+                        k3.metric("Carbon Emission Offset", f"{co2_saved} kg CO2", delta="100% Waste Avoided", delta_color="normal")
                         
                         st.markdown("---")
 
-                        # Allocated Workload Bar Chart
-                        df_alloc = pd.DataFrame(list(alloc.items()), columns=['Machine', 'Allocated Units'])
-                        fig_bar = px.bar(
-                            df_alloc, x='Machine', y='Allocated Units', color='Machine',
-                            text='Allocated Units', title="OR-Tools Dynamic Load Allocation Result",
-                            color_discrete_map={'Machine_A': '#10b981', 'Machine_B': '#ef4444', 'Machine_C': '#3b82f6'}
+                        # Grouped Bar Chart: Before vs After Allocation
+                        chart_data = pd.DataFrame({
+                            'Machine': ['Machine_A', 'Machine_B', 'Machine_C'] * 2,
+                            'Workload (Units)': [
+                                equal_share, equal_share, equal_share, # Baseline
+                                alloc.get('Machine_A', 0), alloc.get('Machine_B', 0), alloc.get('Machine_C', 0) # Optimized
+                            ],
+                            'Allocation Type': ['Unoptimized Baseline'] * 3 + ['CP-SAT AI Optimized'] * 3
+                        })
+
+                        fig_compare = px.bar(
+                            chart_data, 
+                            x='Machine', 
+                            y='Workload (Units)', 
+                            color='Allocation Type',
+                            barmode='group',
+                            text_auto='.0f',
+                            title="📊 Workload Distribution: Baseline vs CP-SAT Optimized",
+                            color_discrete_map={'Unoptimized Baseline': '#4b5563', 'CP-SAT AI Optimized': '#10b981'}
                         )
-                        st.plotly_chart(fig_bar, use_container_width=True)
+                        fig_compare.update_layout(height=350, margin=dict(l=20, r=20, t=40, b=20))
+                        st.plotly_chart(fig_compare, use_container_width=True)
+
+                        # Data Matrix Table
+                        st.write("### 📋 Detailed Allocation Breakdown")
+                        summary_table = pd.DataFrame({
+                            "Machine": ["Machine_A", "Machine_B (Degraded)", "Machine_C"],
+                            "SEC (kWh/Unit)": [0.20, 0.38, 0.24],
+                            "Baseline Units": [round(equal_share), round(equal_share), round(equal_share)],
+                            "Optimized Units": [alloc.get('Machine_A', 0), alloc.get('Machine_B', 0), alloc.get('Machine_C', 0)],
+                            "Optimized Energy (kWh)": [
+                                round(alloc.get('Machine_A', 0) * 0.20, 1),
+                                round(alloc.get('Machine_B', 0) * 0.38, 1),
+                                round(alloc.get('Machine_C', 0) * 0.24, 1)
+                            ]
+                        })
+                        st.dataframe(summary_table, use_container_width=True, hide_index=True)
+
                         st.success("🎉 **Optimization Complete:** Workload shifted away from degraded Machine_B to prevent power surge and motor breakdown!")
                 except Exception as e:
                     st.error(f"Optimization Engine Error: {e}")
