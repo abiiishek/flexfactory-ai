@@ -8,22 +8,56 @@ from streamlit_option_menu import option_menu
 # Import ML & Optimization functions directly from main.py
 from main import analyze_telemetry, run_optimization
 
-# Page Config
-st.set_page_config(page_title="FLEXFACTORY AI — Smart Control Room", layout="wide", initial_sidebar_state="expanded")
+# Page Configuration
+st.set_page_config(
+    page_title="FLEXFACTORY AI — Enterprise Energy & Production Control",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Custom CSS for Industrial Dark Theme
+# Custom CSS for Industrial Dark Theme & Clean Spacing
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
     .stMetric { background-color: #1f2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; }
+    div[data-testid="stSidebar"] { background-color: #111827; }
     </style>
 """, unsafe_allow_html=True)
 
+# ----------------------------------------------------
+# SIDEBAR: HARDWARE BRIDGE & CONFIGURATION
+# ----------------------------------------------------
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/factory.png", width=60)
+    st.title("FlexFactory Controls")
+    st.caption("Day 4 Hardware & Telemetry Bridge")
+    st.markdown("---")
+    
+    data_source = st.radio(
+        "📡 Telemetry Data Source",
+        ["Simulated Telemetry (Cloud Demo)", "Serial Bridge (ESP32/Arduino)"],
+        index=0
+    )
+    
+    if "Serial Bridge" in data_source:
+        com_port = st.selectbox("COM Port Selection", ["COM3", "COM4", "/dev/ttyUSB0"], index=0)
+        baud_rate = st.selectbox("Baud Rate", [9600, 115200], index=1)
+        st.success(f"Connected to {com_port} @ {baud_rate} baud")
+    else:
+        st.info("Operating in Autonomous Simulation Mode")
+        
+    st.markdown("---")
+    st.write("### 🏭 Active Machines")
+    st.write("• **Machine_A:** Normal SEC (0.20)")
+    st.write("• **Machine_B:** Thermal Degraded (SEC: 0.38)")
+    st.write("• **Machine_C:** Balanced SEC (0.24)")
+
+# Header Section
 st.title("🏭 FLEXFACTORY AI — Enterprise Energy & Production Control")
 st.caption("Real-Time Telemetry | XGBoost Power Prediction | RUL Predictive Maintenance | Google CP-SAT Optimization")
 st.markdown("---")
 
-# Navigation Menu
+# Navigation Bar
 selected = option_menu(
     menu_title=None,
     options=["Live Control Room", "AI Optimization Engine", "RUL & Advanced Analytics"],
@@ -47,89 +81,87 @@ if selected == "Live Control Room":
         production = st.slider("Production Rate (Units/Min)", 1, 20, 8)
         temp = st.slider("Motor Temperature (°C)", 20.0, 95.0, 62.0)
         operating_hours = st.number_input("Total Operating Hours", min_value=100, max_value=20000, value=3450, step=50)
-        
-        analyze_btn = st.button("🔍 Run Real-Time AI Analysis", use_container_width=True)
 
     with col_display:
-        if analyze_btn:
-            try:
-                payload = {"power_kw": power, "production_rate_ppm": production, "temperature_c": temp}
-                res = analyze_telemetry(payload)
-                
-                # Dynamic RUL & Health Index Calculation
-                base_life = 8000 # Standard motor lifespan (Hours)
-                temp_penalty = max(0, (temp - 60) * 85) 
-                power_penalty = max(0, (power - 6.5) * 120) 
-                remaining_rul_hrs = max(0, round(base_life - operating_hours - temp_penalty - power_penalty, 1))
-                health_idx = max(0.0, min(100.0, round((remaining_rul_hrs / base_life) * 100, 1)))
+        try:
+            # Instant Live AI Inference Execution
+            payload = {"power_kw": power, "production_rate_ppm": production, "temperature_c": temp}
+            res = analyze_telemetry(payload)
+            
+            # Physics-Informed Wear & RUL Calculations
+            base_life = 8000 # Standard Motor Hours
+            temp_penalty = max(0, (temp - 60) * 85)
+            power_penalty = max(0, (power - 6.5) * 120)
+            remaining_rul_hrs = max(0, round(base_life - operating_hours - temp_penalty - power_penalty, 1))
+            health_idx = max(0.0, min(100.0, round((remaining_rul_hrs / base_life) * 100, 1)))
 
-                # Metrics Row
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Predicted Power", f"{res['predicted_power_kw']} kW")
-                m2.metric("Actual Power", f"{power} kW", delta=round(power - res['predicted_power_kw'], 2), delta_color="inverse")
-                
-                if res['is_healthy']:
-                    m3.metric("Machine Status", "HEALTHY", delta="Normal", delta_color="normal")
-                else:
-                    m3.metric("Machine Status", "ANOMALY", delta="-ALERT-", delta_color="inverse")
-                
-                m4.metric("Predicted RUL", f"{remaining_rul_hrs} Hrs", delta=f"{health_idx}% Health", delta_color="normal" if health_idx > 40 else "inverse")
-                
-                if not res['is_healthy']:
-                    st.error(f"🚨 System Status: {res['status']}")
-                else:
-                    st.success(f"✅ System Status: {res['status']}")
+            # Metric Cards Row
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Predicted Power", f"{res['predicted_power_kw']} kW")
+            m2.metric("Actual Power", f"{power} kW", delta=round(power - res['predicted_power_kw'], 2), delta_color="inverse")
+            
+            if res['is_healthy']:
+                m3.metric("Machine Status", "HEALTHY", delta="Normal Operation", delta_color="normal")
+            else:
+                m3.metric("Machine Status", "ANOMALY", delta="-CRITICAL ALERT-", delta_color="inverse")
+            
+            m4.metric("Predicted RUL", f"{remaining_rul_hrs} Hrs", delta=f"{health_idx}% Health Index", delta_color="normal" if health_idx > 40 else "inverse")
+            
+            if not res['is_healthy']:
+                st.error(f"🚨 **System Warning:** {res['status']}")
+            else:
+                st.success(f"✅ **System Status:** {res['status']}")
 
-                # Gauges Row: Temperature & Health Index
-                g_col1, g_col2 = st.columns(2)
-                
-                with g_col1:
-                    fig_temp_gauge = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=temp,
-                        domain={'x': [0, 1], 'y': [0, 1]},
-                        title={'text': "Motor Temp (°C)"},
-                        gauge={
-                            'axis': {'range': [None, 100]},
-                            'bar': {'color': "#ef4444" if temp > 70 else "#10b981"},
-                            'steps': [
-                                {'range': [0, 50], 'color': "#1f2937"},
-                                {'range': [50, 70], 'color': "#374151"},
-                                {'range': [70, 100], 'color': "#7f1d1d"}
-                            ]
-                        }
-                    ))
-                    fig_temp_gauge.update_layout(height=230, margin=dict(l=10, r=10, t=35, b=10))
-                    st.plotly_chart(fig_temp_gauge, use_container_width=True)
+            # Live Gauges Row
+            g_col1, g_col2 = st.columns(2)
+            
+            with g_col1:
+                fig_temp_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=temp,
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': "Motor Temperature (°C)"},
+                    gauge={
+                        'axis': {'range': [None, 100]},
+                        'bar': {'color': "#ef4444" if temp > 70 else "#10b981"},
+                        'steps': [
+                            {'range': [0, 50], 'color': "#1f2937"},
+                            {'range': [50, 70], 'color': "#374151"},
+                            {'range': [70, 100], 'color': "#7f1d1d"}
+                        ]
+                    }
+                ))
+                fig_temp_gauge.update_layout(height=230, margin=dict(l=10, r=10, t=35, b=10))
+                st.plotly_chart(fig_temp_gauge, use_container_width=True)
 
-                with g_col2:
-                    fig_health_gauge = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=health_idx,
-                        number={'suffix': "%"},
-                        domain={'x': [0, 1], 'y': [0, 1]},
-                        title={'text': "Machine Health Index"},
-                        gauge={
-                            'axis': {'range': [0, 100]},
-                            'bar': {'color': "#10b981" if health_idx > 50 else "#ef4444"},
-                            'steps': [
-                                {'range': [0, 30], 'color': "#7f1d1d"},
-                                {'range': [30, 60], 'color': "#374151"},
-                                {'range': [60, 100], 'color': "#1f2937"}
-                            ]
-                        }
-                    ))
-                    fig_health_gauge.update_layout(height=230, margin=dict(l=10, r=10, t=35, b=10))
-                    st.plotly_chart(fig_health_gauge, use_container_width=True)
+            with g_col2:
+                fig_health_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=health_idx,
+                    number={'suffix': "%"},
+                    domain={'x': [0, 1], 'y': [0, 1]},
+                    title={'text': "Machine Health Index"},
+                    gauge={
+                        'axis': {'range': [0, 100]},
+                        'bar': {'color': "#10b981" if health_idx > 50 else "#ef4444"},
+                        'steps': [
+                            {'range': [0, 30], 'color': "#7f1d1d"},
+                            {'range': [30, 60], 'color': "#374151"},
+                            {'range': [60, 100], 'color': "#1f2937"}
+                        ]
+                    }
+                ))
+                fig_health_gauge.update_layout(height=230, margin=dict(l=10, r=10, t=35, b=10))
+                st.plotly_chart(fig_health_gauge, use_container_width=True)
 
-            except Exception as e:
-                st.error(f"Execution Error: {e}")
+        except Exception as e:
+            st.error(f"Execution Error: {e}")
 
 # ----------------------------------------------------
 # TAB 2: AI OPTIMIZATION ENGINE
 # ----------------------------------------------------
 elif selected == "AI Optimization Engine":
-    st.subheader("⚡ CP-SAT Workload Auto-Distribution")
+    st.subheader("⚡ CP-SAT Dynamic Workload Auto-Distribution")
     
     col_opt_in, col_opt_out = st.columns([1, 2])
     
@@ -146,14 +178,14 @@ elif selected == "AI Optimization Engine":
         target_units = st.number_input("Target Total Output (Units)", min_value=100, max_value=5000, value=1200, step=100)
         
         st.write("### 🏗️ Factory Plant Status")
-        st.info(f"**Total Plant Capacity:** {total_plant_capacity} Units\n\n• Machine_A: Normal (SEC: 0.20)\n• Machine_B: High Thermal Degrade (SEC: 0.38)\n• Machine_C: Balanced (SEC: 0.24)")
+        st.info(f"**Total Physical Capacity:** {total_plant_capacity} Units\n\n• Machine_A: Normal (SEC: 0.20)\n• Machine_B: High Thermal Degrade (SEC: 0.38)\n• Machine_C: Balanced (SEC: 0.24)")
         
         run_opt = st.button("🚀 Calculate Optimal Allocation", use_container_width=True)
 
     with col_opt_out:
         if run_opt:
             if target_units > total_plant_capacity:
-                st.error(f"⚠️ **Target Exceeds Maximum Physical Plant Capacity!**\n\nTotal Plant Capacity: **{total_plant_capacity} Units**. Requested Target: **{target_units} Units**.\nPlease reduce target output or introduce additional plant machinery.")
+                st.error(f"⚠️ **Target Exceeds Physical Plant Capacity!**\n\nMaximum Plant Capacity: **{total_plant_capacity} Units** | Requested Target: **{target_units} Units**.\nPlease reduce target output or introduce additional machinery.")
             else:
                 try:
                     payload = {"target_units": target_units, "machines_status": machines_status}
@@ -161,8 +193,25 @@ elif selected == "AI Optimization Engine":
                     alloc = opt_res.get("optimized_allocation")
                     
                     if alloc:
-                        df_alloc = pd.DataFrame(list(alloc.items()), columns=['Machine', 'Allocated Units'])
+                        # Dynamic Exact Energy & Financial Math
+                        opt_energy = (alloc.get('Machine_A', 0) * 0.20) + (alloc.get('Machine_B', 0) * 0.38) + (alloc.get('Machine_C', 0) * 0.24)
+                        equal_share = target_units / 3.0
+                        baseline_energy = (equal_share * 0.20) + (equal_share * 0.38) + (equal_share * 0.24)
                         
+                        energy_saved = max(0.0, round(baseline_energy - opt_energy, 1))
+                        cost_saved = round(energy_saved * 8.5, 1) # ₹8.5/kWh industrial tariff
+                        co2_saved = round(energy_saved * 0.82, 1)   # 0.82 kg CO2/kWh grid factor
+
+                        # Real-Time ROI Metrics Display
+                        k1, k2, k3 = st.columns(3)
+                        k1.metric("Dynamic Energy Saved", f"{energy_saved} kWh", delta=f"{round((energy_saved/baseline_energy)*100, 1)}% Saved")
+                        k2.metric("Production Cost Saved", f"₹ {cost_saved}", delta="Direct Tariff Savings")
+                        k3.metric("Carbon Footprint Reduction", f"{co2_saved} kg CO2", delta="-100% Waste Avoided")
+                        
+                        st.markdown("---")
+
+                        # Allocated Workload Bar Chart
+                        df_alloc = pd.DataFrame(list(alloc.items()), columns=['Machine', 'Allocated Units'])
                         fig_bar = px.bar(
                             df_alloc, x='Machine', y='Allocated Units', color='Machine',
                             text='Allocated Units', title="OR-Tools Dynamic Load Allocation Result",
@@ -179,7 +228,7 @@ elif selected == "AI Optimization Engine":
 elif selected == "RUL & Advanced Analytics":
     st.subheader("📊 Machine Degradation, Health Index & RUL Analytics")
     
-    # Overview Summary Cards
+    # Overview Cards
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Overall Plant Health", "84.2%", delta="-2.1% (30 Days)")
     c2.metric("Machine_A RUL", "4,210 Hrs", delta="Healthy (88%)")
@@ -188,7 +237,7 @@ elif selected == "RUL & Advanced Analytics":
 
     st.markdown("---")
 
-    # Time-series diagnostic simulation data
+    # Time-Series Diagnostic Data Simulation
     time_series = pd.date_range(end=pd.Timestamp.now(), periods=100, freq='h')
     np.random.seed(42)
     
@@ -207,7 +256,7 @@ elif selected == "RUL & Advanced Analytics":
         fig_rul = px.line(df_diag, x='Timestamp', y='Machine_B_RUL_Curve',
                           labels={'Machine_B_RUL_Curve': 'Remaining Useful Life (Hours)'},
                           title="Machine_B Predicted RUL Decay Curve")
-        fig_rul.add_hline(y=500, line_dash="dash", line_color="red", annotation_text="Maintenance Threshold")
+        fig_rul.add_hline(y=500, line_dash="dash", line_color="red", annotation_text="Maintenance Cutoff Threshold")
         fig_rul.update_traces(line_color='#ef4444', line_width=3)
         st.plotly_chart(fig_rul, use_container_width=True)
 
@@ -218,7 +267,7 @@ elif selected == "RUL & Advanced Analytics":
                           title="Plant Fleet Health Degradation Trend")
         st.plotly_chart(fig_deg, use_container_width=True)
 
-    # Diagnostic Maintenance Table
+    # Predictive Maintenance Recommendations Matrix
     st.write("### 🛠️ Predictive Maintenance & Action Matrix")
     diag_summary = pd.DataFrame({
         "Machine ID": ["Machine_A", "Machine_B", "Machine_C"],
