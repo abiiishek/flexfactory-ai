@@ -7,7 +7,7 @@ from streamlit_option_menu import option_menu
 import json
 import random
 
-# Optional PySerial import for Hardware Bridge
+# Optional PySerial import for STM32 / ESP32 Hardware Bridge
 try:
     import serial
     SERIAL_AVAILABLE = True
@@ -34,29 +34,38 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# HARDWARE SENSOR BRIDGE LOGIC
+# HARDWARE SENSOR BRIDGE LOGIC (STM32 / ESP32 Compatible)
 # ----------------------------------------------------
 def read_hardware_telemetry(data_source, selected_port, baud_rate):
     """
-    Reads hardware sensor stream or simulates live IoT telemetry.
+    Reads STM32 hardware sensor stream via UART/USB Serial or simulates live IoT telemetry.
     Auto-detects machine degradation based on thermal & power thresholds.
     """
     telemetry_data = {}
     
+    # 1. READ FROM STM32 VIA SERIAL
     if data_source == "Serial Bridge" and SERIAL_AVAILABLE:
         try:
             ser = serial.Serial(selected_port, baud_rate, timeout=1)
-            line = ser.readline().decode('utf-8').strip()
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
             ser.close()
+            
             if line:
-                # Expecting JSON format from ESP32/Arduino: {"Machine_A": {"temp": 65, "power": 4.2}, ...}
-                telemetry_data = json.loads(line)
+                # Expecting JSON string from STM32 over Serial
+                parsed_data = json.loads(line)
+                for m_id in ['Machine_A', 'Machine_B', 'Machine_C']:
+                    if m_id in parsed_data:
+                        telemetry_data[m_id] = {
+                            'temp': float(parsed_data[m_id].get('temp', 50.0)),
+                            'power': float(parsed_data[m_id].get('power', 4.0)),
+                            'base_sec': 0.20 if m_id == 'Machine_A' else (0.22 if m_id == 'Machine_B' else 0.24),
+                            'capacity': 600 if m_id == 'Machine_A' else 500
+                        }
         except Exception:
             pass
 
-    # Fallback / Simulated Hardware Stream if Serial fails or in Autonomous Simulation
+    # 2. FALLBACK / SIMULATION (If STM32 disconnected or in Autonomous Simulation Mode)
     if not telemetry_data:
-        # Dynamic hardware sensor simulation with occasional degradation spike
         telemetry_data = {
             'Machine_A': {
                 'temp': round(st.session_state.get('temp_A', 52.0) + random.uniform(-0.5, 0.5), 1),
@@ -78,7 +87,7 @@ def read_hardware_telemetry(data_source, selected_port, baud_rate):
             }
         }
 
-    # AUTOMATIC HEALTH & SEC INFERENCE FROM HARDWARE SENSORS
+    # 3. AUTOMATIC HEALTH & SEC INFERENCE FROM STM32 SENSORS
     # Rule: If Temp > 70°C or Power > 6.0 kW -> Machine is DEGRADED, SEC increases
     live_machine_status = {}
     for m_name, m_data in telemetry_data.items():
